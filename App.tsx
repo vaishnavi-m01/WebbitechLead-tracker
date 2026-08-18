@@ -1,7 +1,7 @@
 import "react-native-gesture-handler";
 import "react-native-reanimated";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -9,6 +9,8 @@ import { NavigationContainer } from "@react-navigation/native";
 
 import StackScreen from "./src/navigation/StackScreen";
 import Toast, { BaseToast } from 'react-native-toast-message';
+import NotificationManager from "./src/utils/NotificationManager";
+import { navigationRef } from "./src/navigation/NavigationService";
 
 const toastConfig = {
   blueToast: (props: any) => (
@@ -23,17 +25,20 @@ const toastConfig = {
 };
 
 const App = () => {
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer>
-          <StatusBar
-            translucent
-            backgroundColor="transparent"
-            barStyle="light-content"
-          />
-          <StackScreen />
-        </NavigationContainer>
+        <NotificationManager>
+          <NavigationContainer ref={navigationRef}>
+            <StatusBar
+              translucent
+              backgroundColor="transparent"
+              barStyle="light-content"
+            />
+            <StackScreen />
+          </NavigationContainer>
+        </NotificationManager>
         <Toast config={toastConfig} />
       </SafeAreaProvider>
     </GestureHandlerRootView>

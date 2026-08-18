@@ -2,19 +2,15 @@ import axios from 'axios';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ENV } from '../.env';
+import * as NavigationService from '../navigation/NavigationService';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
-// In-memory cache so we don't have to `await AsyncStorage.getItem` on every
-// single outgoing request — only the very first request after app launch
-// pays the AsyncStorage read cost, everything after that reads from memory.
+
 let cachedToken: string | null = null;
 
-/**
- * Call this right after a successful login (with the token) and right
- * before logout (with null) to keep memory + AsyncStorage in sync.
- */
+
 export const setAuthToken = async (token: string | null) => {
   cachedToken = token;
   if (token) {
@@ -24,7 +20,6 @@ export const setAuthToken = async (token: string | null) => {
   }
 };
 
-/** Reads the token from memory if we already have it, else from disk. */
 export const loadAuthToken = async () => {
   if (cachedToken === null) {
     cachedToken = await AsyncStorage.getItem(TOKEN_KEY);
@@ -41,7 +36,7 @@ export const getStoredUser = async <T,>(): Promise<T | null> => {
   return raw ? (JSON.parse(raw) as T) : null;
 };
 
-/** Clears everything on logout / forced sign-out (e.g. 401 from the server). */
+
 export const clearAuthSession = async () => {
   await setAuthToken(null);
   await AsyncStorage.removeItem(USER_KEY);
@@ -49,18 +44,16 @@ export const clearAuthSession = async () => {
 
 const api = axios.create({
   baseURL: ENV.API_BASE_URL,
-  timeout: 15000,
+  timeout: 45000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
 });
 
-// Request interceptor: attach `Authorization: Bearer <token>` to every
-// outgoing request automatically, once we have a token stored.
+
 api.interceptors.request.use(async (config) => {
   const token = cachedToken !== null ? cachedToken : await loadAuthToken();
-  console.log("Attached Auth Token from local storage:", token);
   if (token) {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
@@ -68,7 +61,6 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response interceptor for global error handling
 api.interceptors.response.use(
   (response) => {
     return response;
@@ -77,14 +69,16 @@ api.interceptors.response.use(
     let errorMessage = 'Something went wrong. Please try again later.';
 
     if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
+    
       const status = error.response.status;
 
-      // Token expired / invalid — clear the stored session so the app
-      // doesn't keep firing requests with a dead token.
-      if (status === 401) {
+    
+      if (status === 401 && !error.config?.url?.includes('/login')) {
         clearAuthSession();
+        
+        setTimeout(() => {
+          NavigationService.reset('Login');
+        }, 100);
       }
 
       switch (status) {
@@ -92,7 +86,7 @@ api.interceptors.response.use(
           errorMessage = 'Bad Request. Please check the data you have submitted.';
           break;
         case 401:
-          errorMessage = 'Unauthorized. Please login again.';
+          errorMessage = error.response?.data?.message || 'Unauthorized. Please login again.';
           break;
         case 403:
           errorMessage = 'Forbidden. You do not have permission for this action.';
@@ -126,15 +120,20 @@ api.interceptors.response.use(
           }
       }
     } else if (error.request) {
-      // The request was made but no response was received
       errorMessage = 'Network error. Please check your internet connection and try again.';
     } else {
-      // Something happened in setting up the request that triggered an Error
       errorMessage = error.message;
     }
 
     console.error('API Error:', error.response?.status || 'No Status', error.response?.data || error.message);
-    Alert.alert('Error', errorMessage);
+    
+    const isSearchEndpoint = error.config?.url?.includes('/search');
+    const isNotFound = error.response?.status === 404;
+    const errStatus = error.response?.status;
+    
+    if (!(isSearchEndpoint && isNotFound) && errStatus !== 401) {
+      Alert.alert('Error', errorMessage);
+    }
 
     return Promise.reject(error);
   }

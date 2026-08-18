@@ -1,19 +1,14 @@
 
 export const COLORS = {
-  // Surfaces
   background: '#f8f9fa',
   surface: '#ffffff',
   card: '#ffffff',
-  // Text
   text: '#1a1a1a',
   textSecondary: '#5f6368',
   textMuted: '#9aa0a6',
-  // Borders & dividers
   border: '#e8eaed',
   divider: '#dadce0',
-  // Accents (from design)
   accent: '#007BFF',       
-  // accentDark: '',
   theater: '#7c4dff',     
   delivery: '#ff9800',    
   success: '#4caf50',     
@@ -23,6 +18,9 @@ export const COLORS = {
   tagBest: '#f9a825',
   tagSeat: '#7c4dff',
   tagNew: '#4caf50',
+  // Notifications
+  notificationUnreadBg: '#E0F2FE',
+  notificationReadBg: '#FFFFFF',
   nonVeg: '#e53935',     
   // Loyalty
   gold: '#ffd54f',

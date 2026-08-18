@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { moderateScale, verticalScale, IS_TABLET } from "../utils/responsive";
+import { getStoredUser } from "../config/apiConfig";
 
 import HomeScreen from "../tabs/HomeScreen";
 import ProfileScreen from "../tabs/ProfileScreen";
@@ -20,15 +21,43 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const TAB_ITEMS = [
   { name: "HomeTab", label: "Home", icon: "home", component: HomeScreen },
   { name: "FinanceTab", label: "Accounts", icon: "account-balance-wallet", component: IncomeExpenseScreen },
-  { name: "ProfileTab", label: "Profile", icon: "person", component: ProfileScreen },
+  // { name: "ProfileTab", label: "Profile", icon: "person", component: ProfileScreen },
 ];
 
 const TAB_BAR_HEIGHT = verticalScale(IS_TABLET ? 72 : 60);
 
 export default function MainTabNavigator() {
   const insets = useSafeAreaInsets();
-  // Ensure we account for system navigation bars on ALL devices (iOS & Android)
   const bottomInset = insets.bottom > 0 ? insets.bottom : verticalScale(12);
+
+  const [showAccounts, setShowAccounts] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const user = await getStoredUser<any>();
+      if (user) {
+        if (user.user_type === 'super_admin') {
+          setShowAccounts(true);
+        } else if (user.tracker_permissions && user.tracker_permissions.length > 0) {
+          setShowAccounts(true);
+        } else {
+          setShowAccounts(false);
+        }
+      }
+      setLoading(false);
+    };
+    loadUser();
+  }, []);
+
+  if (loading) {
+    return null;
+  }
+
+  const dynamicTabItems = TAB_ITEMS.filter(item => {
+    if (item.name === "FinanceTab") return showAccounts;
+    return true;
+  });
 
   return (
     <View style={styles.rootContainer}>
@@ -38,7 +67,7 @@ export default function MainTabNavigator() {
           tabBarShowLabel: true,
           tabBarHideOnKeyboard: true,
 
-          tabBarStyle: {
+          tabBarStyle: dynamicTabItems.length === 1 ? { display: 'none' } : {
             position: 'absolute',
             left: 0,
             right: 0,
@@ -87,7 +116,7 @@ export default function MainTabNavigator() {
           }
         })}
       >
-        {TAB_ITEMS.map((item) => (
+        {dynamicTabItems.map((item) => (
           <Tab.Screen 
             key={item.name}
             name={item.name as keyof MainTabParamList} 

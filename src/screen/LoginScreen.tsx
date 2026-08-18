@@ -14,12 +14,14 @@ import {
   View,
   StatusBar,
   Animated,
+  ToastAndroid,
 } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { verticalScale, scale, moderateScale } from "../utils/responsive";
 import { useNavigation } from "@react-navigation/native";
 import api, { setAuthToken, setStoredUser } from "../config/apiConfig";
+import { NotificationService } from "../services/NotificationService";
 
 const Login = () => {
   const navigation = useNavigation<any>();
@@ -55,9 +57,7 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // NOTE: backend field name assumed as "email" below (common Laravel
-      // auth convention). If your /login endpoint expects a "username" key
-      // instead, just change the key on the line below.
+    
       const response = await api.post("/login", {
         email: username.trim(),
         password,
@@ -67,20 +67,38 @@ const Login = () => {
       const { status, token, user } = response.data || {};
 
       if (status && token) {
-        // Save token in memory + AsyncStorage — every future api.* call
-        // will automatically carry `Authorization: Bearer <token>` from
-        // here on, via the request interceptor in apiConfig.tsx.
+       
         await setAuthToken(token);
         if (user) {
           await setStoredUser(user);
         }
+
+        try {
+          const fcmToken = await NotificationService.getFCMToken();
+          if (fcmToken) {
+            console.log("FCM Token (Login):", fcmToken);
+            
+            const url = api.defaults.baseURL + "/firebase/fcm/token";
+            const payload = { fcm_token: fcmToken };
+            
+            console.log("FCM API URL:", url);
+            console.log("FCM Payload:", JSON.stringify(payload, null, 2));
+            
+            await api.post("/firebase/fcm/token", payload);
+          }
+        } catch (fcmError) {
+          console.log("Failed to get or send FCM token:", fcmError);
+        }
+
+        ToastAndroid.show("Login Successful", ToastAndroid.SHORT);
         navigation.replace("MainTabs");
       } else {
         Alert.alert("Login failed", response.data?.message || "Please check your credentials.");
       }
-    } catch (error) {
-      // Network / server errors already show an Alert via the response
-      // interceptor in apiConfig.tsx, so nothing else to do here.
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      const errorMessage = error.response?.data?.message || error.message || "An error occurred during login. Please try again.";
+      Alert.alert("Login Error", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -95,7 +113,7 @@ const Login = () => {
         colors={["#0A1628", "#0D2060", "#1A3A8C"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        // style={styles.absoluteFillObject}
+      // style={styles.absoluteFillObject}
       />
 
       {/* Decorative Circles */}
@@ -334,7 +352,7 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(13),
     fontWeight: "600",
     // color: "rgba(255,255,255,0.8)",
-    color:"#000",
+    color: "#000",
     marginBottom: 8,
     letterSpacing: 0.3,
   },

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -14,8 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { COLORS } from '../theme/colors';
-import FinanceView from '../components/FinanceView';
+import FinanceView from '../component/FinanceView';
 import EvilIcons from 'react-native-vector-icons/EvilIcons';
+import { getStoredUser } from '../config/apiConfig';
 
 
 type TabKey = 'income' | 'expense';
@@ -30,15 +31,50 @@ export default function IncomeExpenseScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<TabKey>('income');
+  const [incomeCount, setIncomeCount] = useState<number | null>(null);
+  const [expenseCount, setExpenseCount] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [trackerPermissions, setTrackerPermissions] = useState<string[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    const loadPerms = async () => {
+      const user = await getStoredUser<any>();
+      if (user) {
+        setIsSuperAdmin(user.user_type === 'super_admin');
+        if (user.tracker_permissions) {
+          setTrackerPermissions(user.tracker_permissions);
+        }
+      }
+    };
+    loadPerms();
+  }, []);
+
+  const hasIncomeView = isSuperAdmin || trackerPermissions.includes('102');
+  const hasExpenseView = isSuperAdmin || trackerPermissions.includes('106');
+
+  useEffect(() => {
+    if (!hasIncomeView && hasExpenseView && activeTab === 'income') {
+      handleTabChange('expense');
+    }
+  }, [hasIncomeView, hasExpenseView]);
+
   const isIncome = activeTab === 'income';
 
-  // Dynamic color selection based on active tab state
-  const activeColor = isIncome ? '#10B981' : '#EF4444'; // Emerald green for Income, Vibrant red for Expense
+  const activeColor = isIncome ? '#10B981' : '#EF4444'; 
 
   // Smooth tab slide animation
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Debounce search input to avoid too many API calls
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchInput]);
 
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab);
@@ -65,27 +101,30 @@ export default function IncomeExpenseScreen() {
         translucent
       />
 
-      {/* ─── Premium Glass / Modern Header ─── */}
+ 
       <View style={[styles.header, { paddingTop: statusBarHeight + 12 }]}>
         {/* Top Navigation Row */}
         <View style={styles.headerRow}>
           {showSearch ? (
             <View style={styles.searchBarContainer}>
-              <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); }} style={styles.searchBackBtn}>
+              <TouchableOpacity onPress={() => { setShowSearch(false); setSearchInput(''); setSearchQuery(''); }} style={styles.searchBackBtn}>
                 <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
               </TouchableOpacity>
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search records..."
                 placeholderTextColor="rgba(255,255,255,0.7)"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
+                value={searchInput}
+                onChangeText={(text) => {
+                  setSearchInput(text);
+                }}
+                returnKeyType="search"
                 autoFocus
                 selectionColor="#FFFFFF"
               />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClearBtn}>
-                  <MaterialIcons name="close" size={20} color="#FFFFFF" />
+              {searchInput.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearchInput(''); setSearchQuery(''); }} style={styles.searchClearBtn}>
+                  <MaterialIcons name="close" size={22} color="#FFFFFF" />
                 </TouchableOpacity>
               )}
             </View>
@@ -108,9 +147,8 @@ export default function IncomeExpenseScreen() {
                 </Text>
               </View>
 
-              <TouchableOpacity style={styles.iconCircle} activeOpacity={0.7} onPress={() => setShowSearch(true)}>
-                <EvilIcons name="search" color="#FFFFFF" size={26} />
-                <View style={styles.notifDot} />
+              <TouchableOpacity style={styles.searchIconCircle} activeOpacity={0.7} onPress={() => setShowSearch(true)}>
+                <EvilIcons name="search" color="#FFFFFF" size={24} />
               </TouchableOpacity>
             </>
           )}
@@ -131,6 +169,7 @@ export default function IncomeExpenseScreen() {
           </Animated.View>
 
           {/* Income Tab Button */}
+          {hasIncomeView && (
           <TouchableOpacity
             style={styles.tabItem}
             onPress={() => handleTabChange('income')}
@@ -144,8 +183,8 @@ export default function IncomeExpenseScreen() {
             >
               <MaterialIcons
                 name="trending-up"
-                size={16}
-                color={isIncome ? '#10B981' : '#FFFFFF'}
+                size={18}
+                color={isIncome ? '#007BFF' : '#FFFFFF'}
               />
             </View>
             <Text
@@ -157,8 +196,10 @@ export default function IncomeExpenseScreen() {
               Income
             </Text>
           </TouchableOpacity>
+          )}
 
           {/* Expense Tab Button */}
+          {hasExpenseView && (
           <TouchableOpacity
             style={styles.tabItem}
             onPress={() => handleTabChange('expense')}
@@ -172,8 +213,8 @@ export default function IncomeExpenseScreen() {
             >
               <MaterialIcons
                 name="trending-down"
-                size={16}
-                color={!isIncome ? '#EF4444' : '#FFFFFF'}
+                size={18}
+                color={!isIncome ? '#007BFF' : '#FFFFFF'}
               />
             </View>
             <Text
@@ -185,11 +226,17 @@ export default function IncomeExpenseScreen() {
               Expense
             </Text>
           </TouchableOpacity>
+          )}
         </View>
       </View>
 
       {/* ─── Main Content Area ─── */}
-      <FinanceView type={activeTab} searchQuery={searchQuery} />
+      <FinanceView
+        type={activeTab}
+        searchQuery={searchQuery}
+        onCountChange={(count) => activeTab === 'income' ? setIncomeCount(count) : setExpenseCount(count)}
+        permissions={isSuperAdmin ? ['all'] : trackerPermissions}
+      />
     </View>
   );
 }
@@ -197,26 +244,19 @@ export default function IncomeExpenseScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6',
   },
 
   header: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#007BFF',
     paddingHorizontal: TAB_MARGIN,
-    paddingBottom: 18,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    elevation: 10,
+    paddingBottom: 16,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 12,
     height: 40,
   },
   searchBarContainer: {
@@ -224,8 +264,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
+    borderRadius: 20,
+    paddingHorizontal: 12,
     height: 40,
   },
   searchBackBtn: {
@@ -240,18 +280,22 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#FFFFFF',
     fontSize: 15,
-    padding: 0, 
+    padding: 0,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
-    position: 'relative',
+    alignItems: 'center',
+  },
+  searchIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notifDot: {
     position: 'absolute',
@@ -308,36 +352,24 @@ const styles = StyleSheet.create({
 
   tabContainer: {
     flexDirection: 'row',
-    height: 50,
+    height: 48,
     width: CONTAINER_WIDTH,
-    backgroundColor: 'rgba(0, 0, 0, 0.22)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    borderRadius: 8,
     padding: TAB_PADDING,
     position: 'relative',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)', // Outer glass ring effect
   },
   tabActiveBg: {
     position: 'absolute',
     top: TAB_PADDING,
     left: TAB_PADDING,
     width: TAB_WIDTH,
-    height: 50 - TAB_PADDING * 2,
+    height: 48 - TAB_PADDING * 2,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-    overflow: 'hidden',
+    borderRadius: 6,
   },
   topIndicator: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: 3,
+    display: 'none',
   },
   tabItem: {
     flex: 1,
@@ -352,25 +384,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   unselectedIconChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    padding: 4,
-    borderRadius: 8,
+    padding: 0,
+    backgroundColor: 'transparent',
   },
   tabText: {
     fontSize: 14,
     letterSpacing: 0.2,
   },
   tabTextActiveIncome: {
-    color: '#10B981',
+    color: '#007BFF',
     fontWeight: '700',
   },
   tabTextActiveExpense: {
-    color: '#EF4444',
+    color: '#007BFF',
     fontWeight: '700',
   },
   tabTextUnselected: {
     color: '#FFFFFF',
     fontWeight: '600',
-    opacity: 0.9,
   },
 });

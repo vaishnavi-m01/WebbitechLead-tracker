@@ -7,6 +7,7 @@ import AddLeadsForm from "../screen/AddLeadsForm";
 import EditEnquiryForm from "../screen/EditEnquiryForm";
 import DrawerScreen from "./DrawerScreen";
 import ViewContactLeadDetails from "../screen/ViewLeadDetails";
+import NotificationScreen from "../screen/NotificationScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -26,6 +27,7 @@ const StackScreen = () => {
         <Stack.Screen name="AddLeadsForm" component={AddLeadsForm} options={{ headerShown: false }} />
         <Stack.Screen name="EditEnquiryForm" component={EditEnquiryForm} options={{ headerShown: false }} />
         <Stack.Screen name="ViewContactLeadDetails" component={ViewContactLeadDetails} options={{ headerShown: false }} />
+        <Stack.Screen name="Notifications" component={NotificationScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </View>
   );

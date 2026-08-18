@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
   Modal,
-  Pressable,
   Alert,
   Linking,
 } from 'react-native';
@@ -13,6 +12,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Feather from 'react-native-vector-icons/Feather';
 import { COLORS } from '../theme/colors';
 import api from '../config/apiConfig';
+import { getStatusColor } from './LandingPageCard';
 
 export interface ContactEnquiryLead {
   id: string;
@@ -23,8 +23,15 @@ export interface ContactEnquiryLead {
   email: string;
   phone: string;
   location: string;
+  status: 'New' | 'In Progress' | 'Resolved' | 'Closed' | string;
+  statusColor?: string | null;
   message: string;
-  status: 'New' | 'In Progress' | 'Resolved' | 'Closed';
+  sendWhatsapp?: boolean;
+  leadgen_id?: string | null;
+  company_name?: string | null;
+  industry?: string | null;
+  business_goal?: string | null;
+  meta_ads?: string | null;
 }
 
 interface ContactEnquiryCardProps {
@@ -35,6 +42,7 @@ interface ContactEnquiryCardProps {
   onDelete: (id: string) => void;
   onAssign?: (item: ContactEnquiryLead) => void;
   onAssignStaff?: (item: ContactEnquiryLead, staffValue: string) => void;
+  permissions?: string[];
 }
 
 
@@ -60,14 +68,6 @@ const STATUS_COLORS: Record<ContactEnquiryLead['status'], { bg: string; text: st
   Closed: { bg: '#F3F4F6', text: '#6B7280' },
 };
 
-const STAFF_OPTIONS = [
-  { label: 'Sarah Jenkins', value: 'sarah_jenkins' },
-  { label: 'Marcus Thorne', value: 'marcus_thorne' },
-  { label: 'Anjali Singh', value: 'anjali_singh' },
-  { label: 'Ravi Shankar', value: 'ravi_shankar' },
-  { label: 'Kavin Kumar', value: 'kavin_kumar' },
-];
-
 const ContactEnquiryCard: React.FC<ContactEnquiryCardProps> = ({
   item,
   onAddEnquiry,
@@ -76,10 +76,26 @@ const ContactEnquiryCard: React.FC<ContactEnquiryCardProps> = ({
   onDelete,
   onAssign,
   onAssignStaff,
+  permissions = [],
 }) => {
   const srcColor = SOURCE_COLORS[item.source] ?? { bg: '#F3F4F6', text: '#374151' };
-  const stColor = STATUS_COLORS[item.status] ?? { bg: '#F3F4F6', text: '#374151' };
-  const [statusOptions, setStatusOptions] = useState<DropdownItem[]>([]);
+  
+  // If API gave us a color, use it. Otherwise, use getStatusColor logic.
+  const apiColor = item.statusColor ? { bg: item.statusColor, text: '#FFFFFF' } : null;
+  const stColor = apiColor || getStatusColor(item.status);
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuLayout, setMenuLayout] = useState({ top: 0, right: 0 });
+  const iconRef = useRef<any>(null);
+
+  const openMenu = () => {
+    iconRef.current?.measure((fx: number, fy: number, width: number, height: number, px: number, py: number) => {
+      setMenuLayout({ top: py + height, right: 10 });
+      setShowMenu(true);
+    });
+  };
+
   const handleEmailPress = async () => {
     const rawEmail = item.email ? item.email.trim() : '';
     if (!rawEmail || rawEmail.toUpperCase() === 'N/A' || rawEmail.toUpperCase() === 'NA') {
@@ -106,35 +122,10 @@ const ContactEnquiryCard: React.FC<ContactEnquiryCardProps> = ({
     }
   };
 
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const response = await api.get('/status');
-        if (response.data && Array.isArray(response.data.data)) {
-          const mappedStatus = response.data.data.map((statusItem: any) => ({
-            label: statusItem.name,
-            value: statusItem.name,
-          }));
-          setStatusOptions(mappedStatus);
-        }
-      } catch (error) {
-        console.error('Failed fetching dynamic lead tracking statuses:', error);
-      }
-    };
 
-    fetchStatus();
-  }, []);
 
   const handleDeletePress = () => {
-    Alert.alert(
-      'Delete Lead',
-      'Are you sure you want to delete this lead? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.id) },
-      ],
-      { cancelable: true }
-    );
+    onDelete(item.id);
   };
 
   return (
@@ -148,7 +139,48 @@ const ContactEnquiryCard: React.FC<ContactEnquiryCardProps> = ({
         <View style={[styles.statusBadge, { backgroundColor: stColor.bg }]}>
           <Text style={[styles.statusText, { color: stColor.text }]}>{item.status}</Text>
         </View>
+        <TouchableOpacity ref={iconRef} style={{ marginLeft: 8, padding: 4 }} onPress={openMenu}>
+          <MaterialIcons name="more-vert" size={18} color="#64748B" />
+        </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showMenu}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity 
+          style={{ flex: 1 }} 
+          activeOpacity={1} 
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={[styles.menuContainer, { top: menuLayout.top, right: menuLayout.right, position: 'absolute' }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); onAssign && onAssign(item); }}>
+              <MaterialIcons name="assignment-ind" size={14} color="#3B82F6" />
+              <Text style={styles.menuText}>Assign</Text>
+            </TouchableOpacity>
+            {(permissions.includes('all') || permissions.includes('contact_page_edit')) && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); onEdit(item); }}>
+                <Feather name="edit" size={14} color="#F59E0B" />
+                <Text style={styles.menuText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+            {(permissions.includes('all') || permissions.includes('contact_page_view')) && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); onView(item); }}>
+                <Feather name="eye" size={14} color="#0EA5E9" />
+                <Text style={styles.menuText}>View</Text>
+              </TouchableOpacity>
+            )}
+            {(permissions.includes('all') || permissions.includes('contact_page_delete')) && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); handleDeletePress(); }}>
+                <Feather name="trash-2" size={14} color="#EF4444" />
+                <Text style={styles.menuText}>Delete</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <View style={styles.dateRow}>
         <MaterialIcons name="access-time" size={12} color="#94A3B8" />
@@ -186,32 +218,34 @@ const ContactEnquiryCard: React.FC<ContactEnquiryCardProps> = ({
           isLink
         />
         <InfoItem icon="location-on" label="Location" value={item.location} />
+        
+        {/* Facebook Meta Fields */}
+        {item.leadgen_id && <InfoItem icon="fingerprint" label="Leadgen ID" value={item.leadgen_id} />}
+        {item.company_name && <InfoItem icon="business" label="Company" value={item.company_name} />}
+        {item.industry && <InfoItem icon="domain" label="Industry" value={item.industry} />}
+        {item.business_goal && <InfoItem icon="track-changes" label="Goal" value={item.business_goal} />}
+        {item.meta_ads && <InfoItem icon="campaign" label="Meta Ads" value={item.meta_ads} />}
       </View>
+      
+      {/* Send WhatsApp Status */}
+      {/* <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+         <MaterialIcons name={item.sendWhatsapp ? "check-box" : "check-box-outline-blank"} size={16} color={item.sendWhatsapp ? "#16A34A" : "#94A3B8"} />
+         <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>WhatsApp Communication {item.sendWhatsapp ? 'Enabled' : 'Disabled'}</Text>
+      </View> */}
 
       {/* Message */}
       <View style={styles.messageBox}>
         <Text style={styles.messageLabel}>MESSAGE</Text>
-        <Text style={styles.messageText} numberOfLines={2}>
-          {item.message}
+        <Text style={styles.messageText} numberOfLines={isExpanded ? undefined : 2}>
+          {item.message || 'No message provided.'}
         </Text>
-      </View>
-
-      {/* Actions */}
-      <View style={styles.actionBar}>
-        <View style={styles.iconGroup}>
-          <TouchableOpacity style={styles.assignBtn} onPress={() => onAssign && onAssign(item)} activeOpacity={0.7}>
-            <MaterialIcons name="assignment-ind" size={13} color="#FFFFFF" />
+        {item.message && item.message.length > 80 && (
+          <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
+            <Text style={{ color: '#6D28D9', fontSize: 10, marginTop: 4 }}>
+              {isExpanded ? 'Show Less' : 'Read More'}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(item)} activeOpacity={0.7}>
-            <Feather name="edit" size={13} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.viewBtn} onPress={() => onView(item)} activeOpacity={0.7}>
-            <Feather name="eye" size={13} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDeletePress} activeOpacity={0.7}>
-            <Feather name="trash-2" size={13} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
 
     </View>
@@ -253,16 +287,11 @@ export default ContactEnquiryCard;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 6,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    elevation: 0,
-    shadowColor: 'transparent',
-    shadowOpacity: 0,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 0,
   },
   topRow: {
     flexDirection: 'row',
@@ -276,7 +305,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   sourceText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   statusBadge: {
@@ -285,7 +314,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   dateRow: {
@@ -295,30 +324,30 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '500',
   },
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 10,
+    marginVertical: 4,
   },
   assignedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 6,
     backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#F1F5F9'
   },
   avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -327,36 +356,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   assignedLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#6B7280',
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   assignedName: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#0F172A',
     fontWeight: '600',
   },
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 10,
+    gap: 4,
+    marginBottom: 6,
   },
   infoItem: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
     alignItems: 'flex-start',
   },
   infoLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   infoValue: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
     color: '#0F172A',
     marginTop: 1,
@@ -367,23 +396,48 @@ const styles = StyleSheet.create({
   },
   messageBox: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    borderRadius: 6,
+    padding: 6,
+    marginBottom: 6,
     borderLeftWidth: 3,
     borderLeftColor: '#6D28D9',
   },
   messageLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   messageText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#334155',
-    lineHeight: 18,
+    lineHeight: 16,
+  },
+  menuContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    minWidth: 100,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  menuText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
   },
   actionBar: {
     flexDirection: 'row',

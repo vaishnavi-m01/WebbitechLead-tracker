@@ -16,7 +16,8 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Feather from 'react-native-vector-icons/Feather';
-import DropDownPicker from 'react-native-dropdown-picker';
+
+import { Dropdown } from 'react-native-element-dropdown';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import api from '../config/apiConfig';
@@ -27,13 +28,14 @@ import Toast from 'react-native-toast-message';
 interface DropdownItem {
   label: string;
   value: string;
-  id?: number; // backend id for this option (service/status), used when building the save payload
+  id?: string | number; // backend id for this option (service/status), used when building the save payload
 }
 
 interface FollowUpRecord {
   followup_date: string;
   commend: string | null;
   created_at: string;
+  source?: number | null;
   status_relation: {
     name: string;
   } | null;
@@ -89,6 +91,8 @@ const formatDateForApi = (d: Date | null): string | null => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const localCityCache: Record<string, DropdownItem[]> = {};
+
 const EditEnquiryForm = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -125,6 +129,7 @@ const EditEnquiryForm = () => {
 
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   // Initialize fields and fetch dynamic data
   useEffect(() => {
@@ -152,16 +157,18 @@ const EditEnquiryForm = () => {
     setIsFetchingData(true);
     console.log(`[EditEnquiryForm] Fetching contact details for ID: ${id}`);
     try {
-      const response = await api.get(`/contacts/${id}/followups`);
-      console.log(`[EditEnquiryForm] API Response Status:`, response.status);
+      const response = await api.get(`/contacts/${id}/fbview`);
+      console.log(`[EditEnquiryForm] API Response Status:`, 
+        response.status);
       console.log(`[EditEnquiryForm] API Response Data:`, JSON.stringify(response.data));
       if (response.data && response.data.status && response.data.data) {
         const data = response.data.data;
         setName(data.name || '');
         setEmail(data.email || '');
         setPhone(data.phone || '');
-        setService(data.service || null);
+        setService(data.enquiry_source || data.sources || null);
         setMessage(data.message || '');
+        setSendWhatsapp(data.sources === 'Whatsapp' || data.send_whatsapp === true || data.send_whatsapp === '1' || data.send_whatsapp === 1);
         setSelectedState(data.state || null);
         // Handle city setup (if state is present, we must fetch cities first before setting selectedCity)
         if (data.state) {
@@ -193,10 +200,13 @@ const EditEnquiryForm = () => {
       if (json && !json.error) {
         const indiaData = json.data.find((c: any) => c.name.toLowerCase() === 'india');
         if (indiaData && indiaData.states) {
-          const mappedStates = indiaData.states.map((st: ApiStateItem) => ({
-            label: st.name,
-            value: st.name,
-          }));
+          const mappedStates = indiaData.states.map((st: ApiStateItem) => {
+            const cleanState = st.name ? st.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : st.name;
+            return {
+              label: cleanState,
+              value: cleanState,
+            };
+          });
           setStateOptions(mappedStates);
         }
       }
@@ -208,6 +218,11 @@ const EditEnquiryForm = () => {
   };
 
   const fetchCitiesForSelectedState = async (stateName: string) => {
+    if (localCityCache[stateName]) {
+      setCityOptions(localCityCache[stateName]);
+      return;
+    }
+
     setLoadingLocations(true);
     try {
       const response = await axios.post('https://countriesnow.space/api/v0.1/countries/state/cities', {
@@ -217,10 +232,14 @@ const EditEnquiryForm = () => {
       const json = response.data;
 
       if (json && !json.error && json.data) {
-        const mappedCities = json.data.map((city: string) => ({
-          label: city,
-          value: city,
-        }));
+        const mappedCities = json.data.map((city: string) => {
+          const cleanCity = city ? city.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : city;
+          return {
+            label: cleanCity,
+            value: cleanCity,
+          };
+        });
+        localCityCache[stateName] = mappedCities;
         setCityOptions(mappedCities);
       } else {
         setCityOptions([]);
@@ -242,7 +261,7 @@ const EditEnquiryForm = () => {
         const services = response.data.data.map((item: any) => ({
           label: item.name,
           value: item.name,
-          id: item.id,
+          id: item.id?.toString(),
         }));
 
         setServiceItems(services);
@@ -261,7 +280,7 @@ const EditEnquiryForm = () => {
         const statuses = response.data.data.map((item: any) => ({
           label: item.name,
           value: item.name,
-          id: item.id,
+          id: item.id?.toString(),
         }));
 
         setStatusItems(statuses);
@@ -271,14 +290,28 @@ const EditEnquiryForm = () => {
     }
   };
 
-  // Looks up the backend id for a selected service/status name
-  const getServiceId = (name: string | null): number | null => {
-    if (!name) return null;
-    return serviceItems.find((i) => i.value === name)?.id ?? null;
+  // Lookup the frontend name for display (if API returns ID)
+  const getServiceName = (val: string | null): string | null => {
+    if (!val) return null;
+    const item = serviceItems.find(s => s.id === val.toString() || s.value === val);
+    return item ? item.value : val;
   };
-  const getStatusId = (name: string | null): number | null => {
-    if (!name) return null;
-    return statusItems.find((i) => i.value === name)?.id ?? null;
+  const getStatusName = (val: string | null): string | null => {
+    if (!val) return null;
+    const item = statusItems.find(s => s.id === val.toString() || s.value === val);
+    return item ? item.value : val;
+  };
+
+  // Looks up the backend id for a selected service/status name
+  const getServiceId = (nameOrId: string | null): string | number | null => {
+    if (!nameOrId) return null;
+    const item = serviceItems.find((i) => i.value === nameOrId || i.id === nameOrId.toString());
+    return item?.id ?? nameOrId;
+  };
+  const getStatusId = (nameOrId: string | null): string | number | null => {
+    if (!nameOrId) return null;
+    const item = statusItems.find((i) => i.value === nameOrId || i.id === nameOrId.toString());
+    return item?.id ?? nameOrId;
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -289,9 +322,24 @@ const EditEnquiryForm = () => {
   };
 
   const handleSave = async () => {
-    if (!name || !phone) {
-      Alert.alert('Validation Error', 'Name and Phone are required.');
+    if (!name || !phone || !service) {
+      setShowErrors(true);
+      Alert.alert('Validation Error', 'Name, Phone, and Service are required.');
       return;
+    }
+
+    const validFollowUps = followUpRows.filter(r => r.date || r.service || r.status || (r.commend && r.commend.trim() !== ''));
+
+    for (let i = 0; i < validFollowUps.length; i++) {
+      const row = validFollowUps[i];
+      if (!row.date || !row.service || !row.status) {
+        const missing = [];
+        if (!row.date) missing.push('Date');
+        if (!row.service) missing.push('Service');
+        if (!row.status) missing.push('Status');
+        Alert.alert('Validation Error', `Please complete the missing fields in Follow-up #${i + 1}:\n- ${missing.join('\n- ')}`);
+        return;
+      }
     }
 
     const leadId = leadData?.id;
@@ -300,22 +348,28 @@ const EditEnquiryForm = () => {
       return;
     }
 
+    const normalizeAscii = (str: string | null | undefined) => {
+      if (!str) return str;
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    };
+
     setIsSaving(true);
     try {
       // One entry per Follow-Up row: row 1 -> index 0 of each array, row 2 -> index 1, etc.
       const payload = {
-        name,
-        email,
-        phone,
-        city: selectedCity,
-        state: selectedState,
-        message,
-        sources: service,
-        send_whatsapp: sendWhatsapp,
-        follow_up_date: followUpRows.map(r => formatDateForApi(r.date)),
-        source: followUpRows.map(r => getServiceId(r.service)),
-        status: followUpRows.map(r => getStatusId(r.status)),
-        commend: followUpRows.map(r => r.commend || ''),
+        name: name.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        city: normalizeAscii(selectedCity) || null,
+        state: normalizeAscii(selectedState) || null,
+        message: message ? (message.trim() || null) : null,
+        sources: sendWhatsapp ? 'Whatsapp' : 'ENQ',
+        enquiry_source: getServiceId(service) || null,
+        send_whatsapp: sendWhatsapp ? 1 : 0,
+        follow_up_date: validFollowUps.map(r => formatDateForApi(r.date) || null),
+        source: validFollowUps.map(r => getServiceId(r.service) || null),
+        status: validFollowUps.map(r => getStatusId(r.status) || null),
+        commend: validFollowUps.map(r => r.commend ? (r.commend.trim() || null) : null),
       };
 
       console.log("EditEnquiryForm Saving payload:", JSON.stringify(payload));
@@ -405,17 +459,15 @@ const EditEnquiryForm = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StackHeader
+        navigation={navigation as any}
+        route={{ name: 'AddLeadsForm' } as any}
+        options={{ title: 'Edit Lead Profile' } as any}
+      />
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.pageContent}>
-          <StackHeader
-            navigation={navigation as any}
-            route={{ name: 'AddLeadsForm' } as any}
-            options={{ title: 'Edit Lead Profile' } as any}
-          />
-
           <ScrollView
             style={styles.pageBody}
             contentContainerStyle={styles.scrollContentContainer}
@@ -432,11 +484,15 @@ const EditEnquiryForm = () => {
             <View style={styles.inputFieldGroup}>
               <Text style={styles.fieldInputLabel}>Name <Text style={styles.required}>*</Text></Text>
               <TextInput
-                style={[styles.formTextInputElement, focusedField === 'name' && styles.activeFocusedBorder]}
+                style={[
+                  styles.formTextInputElement, 
+                  focusedField === 'name' && styles.activeFocusedBorder,
+                  showErrors && !name && { borderColor: '#EF4444', borderWidth: 1 }
+                ]}
                 placeholder="Enter Name"
                 placeholderTextColor="#94A3B8"
                 value={name}
-                onChangeText={setName}
+                onChangeText={(t) => setName(t.trimStart())}
                 onFocus={() => setFocusedField('name')}
                 onBlur={() => setFocusedField(null)}
               />
@@ -449,7 +505,7 @@ const EditEnquiryForm = () => {
                 placeholder="Enter Email"
                 placeholderTextColor="#94A3B8"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => setEmail(t.replace(/\s/g, ''))}
                 keyboardType="email-address"
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
@@ -459,11 +515,15 @@ const EditEnquiryForm = () => {
             <View style={styles.inputFieldGroup}>
               <Text style={styles.fieldInputLabel}>Phone <Text style={styles.required}>*</Text></Text>
               <TextInput
-                style={[styles.formTextInputElement, focusedField === 'phone' && styles.activeFocusedBorder]}
+                style={[
+                  styles.formTextInputElement, 
+                  focusedField === 'phone' && styles.activeFocusedBorder,
+                  showErrors && !phone && { borderColor: '#EF4444', borderWidth: 1 }
+                ]}
                 placeholder="Enter Phone"
                 placeholderTextColor="#94A3B8"
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(t) => setPhone(t.replace(/\s/g, ''))}
                 keyboardType="phone-pad"
                 onFocus={() => setFocusedField('phone')}
                 onBlur={() => setFocusedField(null)}
@@ -472,108 +532,95 @@ const EditEnquiryForm = () => {
 
             {/* Service Dropdown - inline, zIndex 5000 */}
             <View style={[styles.inputFieldGroup, { zIndex: 5000, elevation: Platform.OS === 'android' ? 5000 : 0 }]}>
-              <Text style={styles.fieldInputLabel}>Services</Text>
-              <DropDownPicker
-                open={serviceOpen}
-                value={service}
-                items={serviceItems}
-                setOpen={handleServiceOpen}
-                setValue={setService}
-                setItems={setServiceItems}
-                zIndex={5000}
-                zIndexInverse={1000}
-                style={[styles.formInlineDropdown, serviceOpen && styles.activeFocusedDropdownBorder]}
-                dropDownContainerStyle={styles.dropdownMenuFloatingCard}
-                textStyle={styles.dropdownSelectedTextStyle}
+              <Text style={styles.fieldInputLabel}>Services <Text style={styles.required}>*</Text></Text>
+              <Dropdown
+                style={[
+                  styles.formInlineDropdown, 
+                  serviceOpen && styles.activeFocusedDropdownBorder,
+                  showErrors && !service && { borderColor: '#EF4444', borderWidth: 1 }
+                ]}
+                containerStyle={styles.dropdownMenuFloatingCard}
                 placeholderStyle={styles.dropdownPlaceholderStyle}
-                listItemLabelStyle={styles.listItemLabelStyle}
-                selectedItemLabelStyle={styles.selectedItemLabelStyle}
-                selectedItemContainerStyle={styles.selectedItemContainerStyle}
+                selectedTextStyle={styles.dropdownSelectedTextStyle}
+                inputSearchStyle={styles.searchTextInputStyle}
+                itemTextStyle={styles.dropdownSelectedTextStyle}
+                data={serviceItems}
+                maxHeight={300}
+                labelField="label"
+                valueField="value"
                 placeholder="Select Service"
-                listMode="SCROLLVIEW"
-                scrollViewProps={{ nestedScrollEnabled: true }}
-                ArrowDownIconComponent={() => <MaterialIcons name="keyboard-arrow-down" size={20} color="#64748B" />}
-                ArrowUpIconComponent={() => <MaterialIcons name="keyboard-arrow-up" size={20} color="#64748B" />}
+                value={getServiceName(service)}
+                flatListProps={{ nestedScrollEnabled: true }}
+                onFocus={() => handleServiceOpen(true)}
+                onBlur={() => setServiceOpen(false)}
+                onChange={item => {
+                  setService(item.value);
+                  setServiceOpen(false);
+                }}
               />
             </View>
 
             {/* State Dropdown - inline, zIndex 4000 */}
             <View style={[styles.inputFieldGroup, { zIndex: 4000, elevation: Platform.OS === 'android' ? 4000 : 0 }]}>
               <Text style={styles.fieldInputLabel}>State</Text>
-              <DropDownPicker
-                open={stateOpen}
-                value={selectedState}
-                items={stateOptions}
-                setOpen={handleStateOpen}
-                setValue={(val) => {
-                  const value = typeof val === 'function' ? val(selectedState) : val;
-                  setSelectedState(value);
-                  setSelectedCity(null);
-                  if (value) fetchCitiesForSelectedState(value);
-                }}
-                setItems={setStateOptions}
-                zIndex={4000}
-                zIndexInverse={2000}
-                searchable={true}
-                searchPlaceholder="Search state..."
+              <Dropdown
                 style={[styles.formInlineDropdown, stateOpen && styles.activeFocusedDropdownBorder]}
-                dropDownContainerStyle={styles.dropdownMenuFloatingCard}
-                textStyle={styles.dropdownSelectedTextStyle}
+                containerStyle={styles.dropdownMenuFloatingCard}
                 placeholderStyle={styles.dropdownPlaceholderStyle}
-                searchContainerStyle={styles.searchContainerStyle}
-                searchTextInputStyle={styles.searchTextInputStyle}
-                listItemLabelStyle={styles.listItemLabelStyle}
-                selectedItemLabelStyle={styles.selectedItemLabelStyle}
-                selectedItemContainerStyle={styles.selectedItemContainerStyle}
+                selectedTextStyle={styles.dropdownSelectedTextStyle}
+                inputSearchStyle={styles.searchTextInputStyle}
+                itemTextStyle={styles.dropdownSelectedTextStyle}
+                data={stateOptions}
+                search
+                maxHeight={300}
+                labelField="label"
+                valueField="value"
                 placeholder={loadingLocations && stateOptions.length === 0 ? "Loading..." : "Select State"}
-                listMode="SCROLLVIEW"
-                scrollViewProps={{ nestedScrollEnabled: true }}
-                ArrowDownIconComponent={() =>
-                  loadingLocations && stateOptions.length === 0
-                    ? <ActivityIndicator size="small" color={COLORS.accent} />
-                    : <MaterialIcons name="keyboard-arrow-down" size={20} color="#64748B" />
-                }
-                ArrowUpIconComponent={() => <MaterialIcons name="keyboard-arrow-up" size={20} color="#64748B" />}
+                searchPlaceholder="Search state..."
+                value={selectedState}
+                flatListProps={{ nestedScrollEnabled: true }}
+                onFocus={() => handleStateOpen(true)}
+                onBlur={() => setStateOpen(false)}
+                onChange={item => {
+                  setSelectedState(item.value);
+                  setSelectedCity(null);
+                  if (item.value) fetchCitiesForSelectedState(item.value);
+                  setStateOpen(false);
+                }}
               />
             </View>
 
             {/* City Dropdown - inline, zIndex 3000 */}
             <View style={[styles.inputFieldGroup, { zIndex: 3000, elevation: Platform.OS === 'android' ? 3000 : 0 }]}>
               <Text style={styles.fieldInputLabel}>City</Text>
-              <DropDownPicker
-                open={cityOpen}
-                value={selectedCity}
-                items={cityOptions}
-                setOpen={handleCityOpen}
-                setValue={setSelectedCity}
-                setItems={setCityOptions}
-                zIndex={3000}
-                zIndexInverse={3000}
-                searchable={true}
-                searchPlaceholder="Search city..."
-                disabled={!selectedState || loadingLocations}
+              <Dropdown
                 style={[
                   styles.formInlineDropdown,
                   cityOpen && styles.activeFocusedDropdownBorder,
                   (!selectedState || loadingLocations) && styles.disabledInputBackground,
                 ]}
-                dropDownContainerStyle={styles.dropdownMenuFloatingCard}
-                textStyle={styles.dropdownSelectedTextStyle}
+                disable={!selectedState || loadingLocations}
+                containerStyle={styles.dropdownMenuFloatingCard}
                 placeholderStyle={styles.dropdownPlaceholderStyle}
-                searchContainerStyle={styles.searchContainerStyle}
-                searchTextInputStyle={styles.searchTextInputStyle}
-                listItemLabelStyle={styles.listItemLabelStyle}
-                selectedItemLabelStyle={styles.selectedItemLabelStyle}
-                selectedItemContainerStyle={styles.selectedItemContainerStyle}
+                selectedTextStyle={styles.dropdownSelectedTextStyle}
+                selectedTextProps={{ numberOfLines: 1 }}
+                inputSearchStyle={styles.searchTextInputStyle}
+                itemTextStyle={styles.dropdownSelectedTextStyle}
+                data={cityOptions}
+                search
+                maxHeight={300}
+                labelField="label"
+                valueField="value"
                 placeholder={loadingLocations && selectedState ? "Loading cities..." : selectedState ? "Select City" : "Select State first"}
-                listMode="SCROLLVIEW"
-                scrollViewProps={{ nestedScrollEnabled: true }}
-                ArrowDownIconComponent={() =>
-                  loadingLocations && selectedState
-                    ? <ActivityIndicator size="small" color={COLORS.accent} />
-                    : <MaterialIcons name="keyboard-arrow-down" size={20} color={!selectedState ? "#CBD5E1" : "#64748B"} />
-                }
-                ArrowUpIconComponent={() => <MaterialIcons name="keyboard-arrow-up" size={20} color="#64748B" />}
+                searchPlaceholder="Search city..."
+                value={selectedCity}
+                flatListProps={{ nestedScrollEnabled: true }}
+                onFocus={() => handleCityOpen(true)}
+                onBlur={() => setCityOpen(false)}
+                onChange={item => {
+                  setSelectedCity(item.value);
+                  setCityOpen(false);
+                }}
               />
             </View>
 
@@ -585,7 +632,7 @@ const EditEnquiryForm = () => {
                 placeholder="Enter message description..."
                 placeholderTextColor="#94A3B8"
                 value={message}
-                onChangeText={setMessage}
+                onChangeText={(t) => setMessage(t.trimStart())}
                 multiline={true}
                 numberOfLines={4}
                 textAlignVertical="top"
@@ -616,7 +663,7 @@ const EditEnquiryForm = () => {
 
                   {/* Date */}
                   <View style={styles.inputFieldGroup}>
-                    <Text style={styles.fieldInputLabel}>Follow Up Date</Text>
+                    <Text style={styles.fieldInputLabel}>Follow Up Date </Text>
                     <TouchableOpacity
                       style={[styles.formTextInputElement, styles.datePickerBtn, focusedField === `date_${row.id}` && styles.activeFocusedBorder]}
                       activeOpacity={0.7}
@@ -636,58 +683,52 @@ const EditEnquiryForm = () => {
                   {/* Service - inline dropdown */}
                   <View style={[styles.inputFieldGroup, { zIndex: rowBaseZ, elevation: Platform.OS === 'android' ? rowBaseZ : 0 }]}>
                     <Text style={styles.fieldInputLabel}>Service</Text>
-                    <DropDownPicker
-                      open={row.serviceOpen}
-                      value={row.service}
-                      items={serviceItems}
-                      setOpen={(val) => handleRowServiceOpen(row.id, val)}
-                      setValue={(callback) => {
-                        setFollowUpRows(prev => prev.map(r => r.id === row.id ? { ...r, service: typeof callback === 'function' ? callback(r.service) : callback } : r));
-                      }}
-                      setItems={setServiceItems}
-                      zIndex={rowBaseZ}
-                      zIndexInverse={rowBaseZ}
+                    <Dropdown
                       style={[styles.formInlineDropdown, row.serviceOpen && styles.activeFocusedDropdownBorder]}
-                      dropDownContainerStyle={styles.dropdownMenuFloatingCard}
-                      textStyle={styles.dropdownSelectedTextStyle}
+                      containerStyle={styles.dropdownMenuFloatingCard}
                       placeholderStyle={styles.dropdownPlaceholderStyle}
-                      listItemLabelStyle={styles.listItemLabelStyle}
-                      selectedItemLabelStyle={styles.selectedItemLabelStyle}
-                      selectedItemContainerStyle={styles.selectedItemContainerStyle}
+                      selectedTextStyle={styles.dropdownSelectedTextStyle}
+                      inputSearchStyle={styles.searchTextInputStyle}
+                      itemTextStyle={styles.dropdownSelectedTextStyle}
+                      data={serviceItems}
+                      maxHeight={300}
+                      labelField="label"
+                      valueField="value"
                       placeholder="Select Service"
-                      listMode="SCROLLVIEW"
-                      scrollViewProps={{ nestedScrollEnabled: true }}
-                      ArrowDownIconComponent={() => <MaterialIcons name="keyboard-arrow-down" size={20} color="#64748B" />}
-                      ArrowUpIconComponent={() => <MaterialIcons name="keyboard-arrow-up" size={20} color="#64748B" />}
+                      value={getServiceName(row.service)}
+                      flatListProps={{ nestedScrollEnabled: true }}
+                      onFocus={() => handleRowServiceOpen(row.id, true)}
+                      onBlur={() => handleRowServiceOpen(row.id, false)}
+                      onChange={item => {
+                        setFollowUpRows(prev => prev.map(r => r.id === row.id ? { ...r, service: item.value ?? null } : r));
+                        handleRowServiceOpen(row.id, false);
+                      }}
                     />
                   </View>
 
                   {/* Status - inline dropdown */}
                   <View style={[styles.inputFieldGroup, { zIndex: rowBaseZ - 10, elevation: Platform.OS === 'android' ? rowBaseZ - 10 : 0 }]}>
                     <Text style={styles.fieldInputLabel}>Status</Text>
-                    <DropDownPicker
-                      open={row.statusOpen}
-                      value={row.status}
-                      items={statusItems}
-                      setOpen={(val) => handleRowStatusOpen(row.id, val)}
-                      setValue={(callback) => {
-                        setFollowUpRows(prev => prev.map(r => r.id === row.id ? { ...r, status: typeof callback === 'function' ? callback(r.status) : callback } : r));
-                      }}
-                      setItems={setStatusItems}
-                      zIndex={rowBaseZ - 10}
-                      zIndexInverse={rowBaseZ - 10}
+                    <Dropdown
                       style={[styles.formInlineDropdown, row.statusOpen && styles.activeFocusedDropdownBorder]}
-                      dropDownContainerStyle={styles.dropdownMenuFloatingCard}
-                      textStyle={styles.dropdownSelectedTextStyle}
+                      containerStyle={styles.dropdownMenuFloatingCard}
                       placeholderStyle={styles.dropdownPlaceholderStyle}
-                      listItemLabelStyle={styles.listItemLabelStyle}
-                      selectedItemLabelStyle={styles.selectedItemLabelStyle}
-                      selectedItemContainerStyle={styles.selectedItemContainerStyle}
+                      selectedTextStyle={styles.dropdownSelectedTextStyle}
+                      inputSearchStyle={styles.searchTextInputStyle}
+                      itemTextStyle={styles.dropdownSelectedTextStyle}
+                      data={statusItems}
+                      maxHeight={300}
+                      labelField="label"
+                      valueField="value"
                       placeholder="Select Status"
-                      listMode="SCROLLVIEW"
-                      scrollViewProps={{ nestedScrollEnabled: true }}
-                      ArrowDownIconComponent={() => <MaterialIcons name="keyboard-arrow-down" size={20} color="#64748B" />}
-                      ArrowUpIconComponent={() => <MaterialIcons name="keyboard-arrow-up" size={20} color="#64748B" />}
+                      value={getStatusName(row.status)}
+                      flatListProps={{ nestedScrollEnabled: true }}
+                      onFocus={() => handleRowStatusOpen(row.id, true)}
+                      onBlur={() => handleRowStatusOpen(row.id, false)}
+                      onChange={item => {
+                        setFollowUpRows(prev => prev.map(r => r.id === row.id ? { ...r, status: item.value ?? null } : r));
+                        handleRowStatusOpen(row.id, false);
+                      }}
                     />
                   </View>
 
@@ -699,7 +740,7 @@ const EditEnquiryForm = () => {
                       placeholder="Enter summary or notes..."
                       placeholderTextColor="#94A3B8"
                       value={row.commend}
-                      onChangeText={(text) => setFollowUpRows(prev => prev.map(r => r.id === row.id ? { ...r, commend: text } : r))}
+                      onChangeText={(text) => setFollowUpRows(prev => prev.map(r => r.id === row.id ? { ...r, commend: text.trimStart() } : r))}
                       multiline={true}
                       numberOfLines={4}
                       textAlignVertical="top"
@@ -744,10 +785,11 @@ const EditEnquiryForm = () => {
                           <Text style={styles.followupStatusText}>{f.status_relation?.name || 'Status Updated'}</Text>
                           <Text style={styles.followupDateText}>{formattedDate}</Text>
                         </View>
-                        {f.commend && <Text style={styles.followupCommentText}>{f.commend}</Text>}
-                        {f.followup_date && (
+                        {f.source ? <Text style={styles.followupNextDateText}>Service: {serviceItems.find(s => s.id == f.source || s.value == f.source)?.label || `ID: ${f.source}`}</Text> : null}
+                        {f.commend ? <Text style={styles.followupCommentText}>{f.commend}</Text> : null}
+                        {f.followup_date ? (
                           <Text style={styles.followupNextDateText}>Next: {f.followup_date.split(' ')[0]}</Text>
-                        )}
+                        ) : null}
                       </View>
                     );
                   })}
@@ -764,35 +806,33 @@ const EditEnquiryForm = () => {
               <View style={[styles.checkboxInputDisplay, sendWhatsapp && styles.checkboxActiveCheckedState]}>
                 {sendWhatsapp && <MaterialIcons name="check" size={14} color="#FFFFFF" />}
               </View>
-              <Text style={styles.checkboxLabelContentText}>Send updates via WhatsApp notification</Text>
+              <Text style={styles.checkboxLabelContentText}>Send this enquiry to customer via WhatsApp</Text>
             </TouchableOpacity>
 
-            <View style={{ height: 30 }} />
           </ScrollView>
+        </KeyboardAvoidingView>
 
-          {/* Footer Buttons */}
-          <View style={styles.pageFooter}>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              disabled={isSaving}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.closeBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} onPress={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={styles.saveBtnText}>Processing...</Text>
-                </View>
-              ) : (
-                <Text style={styles.saveBtnText}>Save Follow Up</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+        {/* Footer Buttons — outside KAV so keyboard doesn't push it */}
+        <View style={styles.pageFooter}>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            disabled={isSaving}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.closeBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} onPress={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.saveBtnText}>Processing...</Text>
+              </View>
+            ) : (
+              <Text style={styles.saveBtnText}>Save Follow Up</Text>
+            )}
+          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
   );
 };
 
@@ -846,7 +886,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   required: {
-    color: '#EF4444',
+    color: 'red',
   },
   fieldInputLabel: {
     fontSize: 12,
@@ -928,10 +968,13 @@ const styles = StyleSheet.create({
   },
   dropdownMenuFloatingCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginTop: 2,
+    marginTop: -28,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
     maxHeight: 220,
   },
   searchContainerStyle: {
@@ -941,12 +984,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   searchTextInputStyle: {
-    borderWidth: 1,
+    borderWidth: 0,
+    borderBottomWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 8,
     fontSize: 13,
     color: '#0F172A',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     height: 38,
   },
   listItemLabelStyle: {
@@ -1047,7 +1090,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
     gap: 12,
-    paddingBottom: Platform.OS === 'android' ? 45 : 24,
+    paddingBottom: Platform.OS === 'android' ? 50 : 24,
   },
   closeBtn: {
     flex: 1,
@@ -1065,7 +1108,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   saveBtn: {
-    flex: 2,
+    flex: 1,
     height: 46,
     borderRadius: 10,
     backgroundColor: COLORS.accent || '#2563EB',
@@ -1120,3 +1163,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
+
+

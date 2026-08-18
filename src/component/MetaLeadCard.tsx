@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -23,9 +23,12 @@ interface MetaLeadCardProps {
   onView: (item: MetaLead) => void;
   onDelete: (id: string) => void;
   onAssign?: (item: MetaLead) => void;
+  permissions?: string[];
 }
 
 const MetaLeadCard: React.FC<MetaLeadCardProps> = ({ item, onAction, onEdit, onView, onDelete, onAssign }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
     <View style={styles.card}>
       {/* Header: Meta badge + Date */}
@@ -81,10 +84,21 @@ const MetaLeadCard: React.FC<MetaLeadCardProps> = ({ item, onAction, onEdit, onV
       </View>
 
       {/* Specific Message */}
-      <View style={styles.specificMsgBox}>
-        <Text style={styles.specificMsgLabel}>SPECIFIC MESSAGE</Text>
-        <Text style={styles.specificMsgText} numberOfLines={3}>{item.specificMessage}</Text>
-      </View>
+      {item.specificMessage ? (
+        <View style={styles.specificMsgBox}>
+          <Text style={styles.specificMsgLabel}>SPECIFIC MESSAGE</Text>
+          <Text style={styles.specificMsgText} numberOfLines={isExpanded ? undefined : 2}>
+            {item.specificMessage}
+          </Text>
+          {item.specificMessage.length > 80 && (
+            <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
+              <Text style={{ color: '#1877F2', fontSize: 10, marginTop: 4, fontWeight: '700' }}>
+                {isExpanded ? 'Show Less' : 'Read More'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : null}
 
       {/* Action Row */}
       <View style={styles.actionBar}>
@@ -121,16 +135,11 @@ export default MetaLeadCard;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1.5,
-    borderColor: '#DBEAFE',
-    elevation: 0,
-    shadowColor: 'transparent',
-    shadowOpacity: 0,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 0,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   topRow: {
     flexDirection: 'row',
@@ -147,7 +156,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   metaBadgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
     color: '#1877F2',
   },
@@ -157,30 +166,30 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '500',
   },
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 10,
+    marginVertical: 4,
   },
   assignedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 6,
     backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#F1F5F9'
   },
   avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -189,20 +198,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   assignedLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#6B7280',
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   assignedName: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#0F172A',
     fontWeight: '600',
   },
   namePhoneRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   nameBlock: {
     flex: 1,
@@ -212,15 +221,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   fieldLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   nameText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     color: '#0F172A',
   },
@@ -230,14 +239,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   phoneText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.accent,
   },
   tagRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
+    gap: 4,
+    marginBottom: 6,
   },
   bizTag: {
     flexDirection: 'row',
@@ -249,7 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   bizTagText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#0EA5E9',
   },
@@ -263,29 +272,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   cityTagText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#10B981',
   },
   specificMsgBox: {
     backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    borderRadius: 6,
+    padding: 6,
+    marginBottom: 6,
     borderLeftWidth: 3,
     borderLeftColor: '#1877F2',
   },
   specificMsgLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   specificMsgText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#334155',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   actionBar: {
     flexDirection: 'row',

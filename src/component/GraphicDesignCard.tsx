@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Feather from 'react-native-vector-icons/Feather';
 import { COLORS } from '../theme/colors';
@@ -11,6 +11,7 @@ export interface GraphicDesignLead {
   email: string;
   phone: string;
   message: string;
+  requirements?: string;
   assignedName?: string;
 }
 
@@ -21,21 +22,35 @@ interface GraphicDesignCardProps {
   onView: (item: GraphicDesignLead) => void;
   onDelete: (id: string) => void;
   onAssign?: (item: GraphicDesignLead) => void;
+  permissions?: string[];
 }
 
 const GraphicDesignCard: React.FC<GraphicDesignCardProps> = ({ item, onAction, onEdit, onView, onDelete, onAssign }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleDeletePress = () => {
+    Alert.alert('Delete Lead', 'Are you sure you want to delete this lead?', [
+      { text: 'Cancel' },
+      { text: 'Delete', onPress: () => onDelete(item.id), style: 'destructive' },
+    ]);
+  };
+
   return (
     <View style={styles.card}>
-      {/* Header: Badge + DateTime */}
+      {/* Header: DateTime + Badge + Delete */}
       <View style={styles.topRow}>
-        <View style={styles.badge}>
-          <MaterialIcons name="brush" size={12} color="#6D28D9" />
-          <Text style={styles.badgeText}>Graphic Design</Text>
-        </View>
         <View style={styles.dateRow}>
           <MaterialIcons name="access-time" size={12} color="#94A3B8" />
           <Text style={styles.dateText}>{item.dateTime}</Text>
         </View>
+        <View style={{ flex: 1 }} />
+        <View style={styles.badge}>
+          <MaterialIcons name="brush" size={12} color="#6D28D9" />
+          <Text style={styles.badgeText}>Graphic Design</Text>
+        </View>
+        <TouchableOpacity style={{ marginLeft: 6 }} onPress={handleDeletePress} activeOpacity={0.7}>
+          <Feather name="trash-2" size={16} color="#EF4444" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.divider} />
@@ -60,35 +75,17 @@ const GraphicDesignCard: React.FC<GraphicDesignCardProps> = ({ item, onAction, o
 
       {/* Message */}
       <View style={styles.messageBox}>
-        <Text style={styles.messageLabel}>MESSAGE</Text>
-        <Text style={styles.messageText} numberOfLines={2}>{item.message}</Text>
-      </View>
-
-      {/* Action Row */}
-      <View style={styles.actionBar}>
-        {/* Primary action */}
-        <TouchableOpacity style={styles.actionBtn} onPress={() => onAction(item)} activeOpacity={0.8}>
-          <MaterialIcons name="palette" size={13} color="#FFFFFF" />
-          <Text style={styles.actionBtnText}>View Portfolio</Text>
-        </TouchableOpacity>
-
-        {/* Actions */}
-        <View style={styles.iconGroup}>
-          {/* {onAssign && (
-            <TouchableOpacity style={styles.assignBtn} onPress={() => onAssign(item)} activeOpacity={0.7}>
-              <MaterialIcons name="assignment-ind" size={13} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(item)} activeOpacity={0.7}>
-            <Feather name="edit" size={13} color="#FFFFFF" />
+        <Text style={styles.messageLabel}>REQUIREMENTS</Text>
+        <Text style={styles.messageText} numberOfLines={isExpanded ? undefined : 2}>
+          {item.requirements || item.message || 'No requirements provided.'}
+        </Text>
+        {(item.requirements || item.message) && (item.requirements || item.message).length > 80 && (
+          <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
+            <Text style={{ color: '#7C3AED', fontSize: 10, marginTop: 4 }}>
+              {isExpanded ? 'Show Less' : 'Read More'}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.viewBtn} onPress={() => onView(item)} activeOpacity={0.7}>
-            <Feather name="eye" size={13} color="#FFFFFF" />
-          </TouchableOpacity> */}
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(item.id)} activeOpacity={0.7}>
-            <Feather name="trash-2" size={13} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
     </View>
   );
@@ -123,16 +120,11 @@ export default GraphicDesignCard;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 6,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    elevation: 0,
-    shadowColor: 'transparent',
-    shadowOpacity: 0,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 0,
   },
   topRow: {
     flexDirection: 'row',
@@ -149,7 +141,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
     color: '#6D28D9',
   },
@@ -159,30 +151,30 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '500',
   },
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 10,
+    marginVertical: 4,
   },
   assignedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 6,
     backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#F1F5F9'
   },
   avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -191,37 +183,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   assignedLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#6B7280',
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   assignedName: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#0F172A',
     fontWeight: '600',
   },
   infoGrid: {
-    gap: 8,
-    marginBottom: 10,
+    gap: 2,
+    marginBottom: 6,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 6,
   },
   infoText: {
     flex: 1,
   },
   infoLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   infoValue: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
     color: '#0F172A',
     marginTop: 1,
@@ -232,23 +224,23 @@ const styles = StyleSheet.create({
   },
   messageBox: {
     backgroundColor: '#F5F3FF',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    borderRadius: 6,
+    padding: 6,
+    marginBottom: 6,
     borderLeftWidth: 3,
     borderLeftColor: '#7C3AED',
   },
   messageLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   messageText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#334155',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   actionBar: {
     flexDirection: 'row',

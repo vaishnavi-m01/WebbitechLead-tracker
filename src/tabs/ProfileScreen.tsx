@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   RefreshControl,
+  Alert,
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -15,12 +16,13 @@ import { COLORS } from "../theme/colors";
 import { getStoredUser, clearAuthSession } from "../config/apiConfig";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Shape of the "user" object as it comes back from the login API response
 type LoggedInUser = {
   id?: number;
   name?: string;
   email?: string;
   user_type?: string;
+  website_permissions?: string[];
+  tracker_permissions?: string[];
 };
 
 const getInitials = (name?: string) => {
@@ -72,7 +74,7 @@ const ProfileScreen = () => {
   const onRefresh = async () => {
     setIsRefreshing(true);
     await fetchProfileData();
-    // Simulate additional network delay if desired, or just let it finish immediately
+   
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -80,12 +82,26 @@ const ProfileScreen = () => {
   const displayEmail = user?.email || "";
   const displayRole = formatRole(user?.user_type);
 
-  const handleLogout = async () => {
-    try {
-      await clearAuthSession();
-    } catch (error) {
-      console.error("Failed to clear session on logout", error);
-    }
+  const handleLogout = () => {
+    Alert.alert(
+      "Confirm Logout",
+      "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Logout", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await clearAuthSession();
+              navigation.replace('Login');
+            } catch (error) {
+              console.error("Failed to clear session on logout", error);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderMenuItem = (item: MenuItem, isLast: boolean) => (
@@ -163,22 +179,7 @@ const ProfileScreen = () => {
       </View>
 
       {/* Stats row */}
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>0</Text>
-          <Text style={styles.statLabel}>Leads</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>0</Text>
-          <Text style={styles.statLabel}>Enquiries</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>0</Text>
-          <Text style={styles.statLabel}>Closed</Text>
-        </View>
-      </View>
+      
 
       <ScrollView
         showsVerticalScrollIndicator={false}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View, Linking, Alert, TouchableOpacity } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -22,9 +22,12 @@ interface DMLeadCardProps {
   onView: (item: DMLeadData) => void;
   onDelete: (id: string) => void;
   onAssign?: (item: DMLeadData) => void;
+  permissions?: string[];
 }
 
 const DMLeadCard: React.FC<DMLeadCardProps> = ({ item, onAction, onEdit, onView, onDelete, onAssign }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Navigation Handlers
   const handlePhonePress = async () => {
     if (!item.phone) return;
@@ -47,7 +50,6 @@ const DMLeadCard: React.FC<DMLeadCardProps> = ({ item, onAction, onEdit, onView,
   const handleWhatsAppPress = async () => {
     if (!item.phone) return;
     try {
-      // Remove plus, spaces, etc for WhatsApp format. Simple formatting for Indian numbers (or standard international)
       const formattedPhone = item.phone.replace(/[^0-9]/g, '');
       await Linking.openURL(`whatsapp://send?phone=${formattedPhone}`);
     } catch {
@@ -55,17 +57,21 @@ const DMLeadCard: React.FC<DMLeadCardProps> = ({ item, onAction, onEdit, onView,
     }
   };
 
+  const handleDeletePress = () => {
+    onDelete(item.id);
+  };
+
   return (
     <View style={styles.card}>
-      {/* Header: DM badge + DateTime */}
+      {/* Header: DateTime + DM badge + Delete */}
       <View style={styles.topRow}>
-        <View style={styles.dmBadge}>
-          <MaterialIcons name="message" size={12} color="#9D174D" />
-          <Text style={styles.dmBadgeText}>DM</Text>
-        </View>
         <View style={styles.dateRow}>
           <MaterialIcons name="access-time" size={12} color="#94A3B8" />
           <Text style={styles.dateText}>{item.dateTime}</Text>
+        </View>
+        <View style={{ flex: 1 }} />
+        <View style={styles.dmBadge}>
+          <Text style={styles.dmBadgeText}>DM Lead</Text>
         </View>
       </View>
 
@@ -92,12 +98,20 @@ const DMLeadCard: React.FC<DMLeadCardProps> = ({ item, onAction, onEdit, onView,
       {/* Message */}
       <View style={styles.messageBox}>
         <Text style={styles.messageLabel}>MESSAGE</Text>
-        <Text style={styles.messageText} numberOfLines={2}>{item.message}</Text>
+        <Text style={styles.messageText} numberOfLines={isExpanded ? undefined : 2}>
+          {item.message || 'No message provided.'}
+        </Text>
+        {item.message && item.message.length > 80 && (
+          <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
+            <Text style={{ color: '#DB2777', fontSize: 10, marginTop: 4 }}>
+              {isExpanded ? 'Show Less' : 'Read More'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Action Row */}
       <View style={styles.actionBar}>
-        {/* Compact Centered Primary Action Button */}
         <TouchableOpacity style={styles.actionBtn} onPress={handleWhatsAppPress} activeOpacity={0.8}>
           <FontAwesome name="whatsapp" size={14} color="#FFFFFF" />
           <Text style={styles.actionBtnText}>Reply via DM</Text>
@@ -160,13 +174,11 @@ export default DMLeadCard;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 6,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    elevation: 0,
-    shadowColor: 'transparent',
   },
   topRow: {
     flexDirection: 'row',
@@ -183,7 +195,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   dmBadgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
     color: '#9D174D',
   },
@@ -193,30 +205,30 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '500',
   },
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 10,
+    marginVertical: 4,
   },
   assignedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 6,
     backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#F1F5F9'
   },
   avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -225,37 +237,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   assignedLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#6B7280',
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   assignedName: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#0F172A',
     fontWeight: '600',
   },
   infoGrid: {
-    gap: 8,
-    marginBottom: 10,
+    gap: 2,
+    marginBottom: 6,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 6,
   },
   infoText: {
     flex: 1,
   },
   infoLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   infoValue: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
     color: '#0F172A',
     marginTop: 1,
@@ -266,23 +278,23 @@ const styles = StyleSheet.create({
   },
   messageBox: {
     backgroundColor: '#FFF5F7',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    borderRadius: 6,
+    padding: 6,
+    marginBottom: 6,
     borderLeftWidth: 3,
     borderLeftColor: '#DB2777',
   },
   messageLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#94A3B8',
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   messageText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#334155',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   actionBar: {
     flexDirection: 'row',

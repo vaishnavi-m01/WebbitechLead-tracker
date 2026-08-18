@@ -8,4 +8,5 @@ export type RootStackParamList = {
     AddLeadsForm: { leadData?: any } | undefined;
     EditEnquiryForm: { leadData: any };
     ViewContactLeadDetails: { leadData: any };
+    Notifications: undefined;
 }

@@ -36,11 +36,17 @@ interface LeadDetails {
   city: string;
   sources: string;
   message: string;
+  created_at: string;
+  updated_at: string;
   followups: FollowUpRecord[];
   // Fallbacks if available
   websiteType?: string;
-  business_goal?: string;
-  status?: string; 
+  business_goal?: string | null;
+  status?: string;
+  leadgen_id?: string | null;
+  company_name?: string | null;
+  industry?: string | null;
+  meta_ads?: string | null;
 }
 
 const ViewContactLeadDetails = () => {
@@ -60,10 +66,12 @@ const ViewContactLeadDetails = () => {
     }
   }, [leadData]);
 
+  
+  //fetchLeadDetails
   const fetchLeadDetails = async (id: number | string) => {
     try {
       setLoading(true);
-      const response = await api.get(`/contacts/${id}/followups`);
+      const response = await api.get(`/contacts/${id}/fbview`);
       
       if (response.data?.status && response.data?.data) {
         setDetails(response.data.data);
@@ -133,28 +141,32 @@ const ViewContactLeadDetails = () => {
       />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
 
-        {/* Floating Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          <TouchableOpacity style={styles.actionBtn} onPress={handlePhonePress} activeOpacity={0.8}>
-            <View style={[styles.actionIconCircle, { backgroundColor: '#E0E7FF' }]}>
-              <MaterialIcons name="phone" size={20} color="#4F46E5" />
-            </View>
-            <Text style={styles.actionBtnText}>Call</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={handleEmailPress} activeOpacity={0.8} disabled={!details.email}>
-            <View style={[styles.actionIconCircle, { backgroundColor: '#FCE7F3', opacity: details.email ? 1 : 0.5 }]}>
-              <MaterialIcons name="email" size={20} color="#DB2777" />
-            </View>
-            <Text style={styles.actionBtnText}>Email</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={() => {}} activeOpacity={0.8}>
-            <View style={[styles.actionIconCircle, { backgroundColor: '#DCFCE7' }]}>
-              <MaterialIcons name="message" size={20} color="#16A34A" />
-            </View>
-            <Text style={styles.actionBtnText}>WhatsApp</Text>
-          </TouchableOpacity>
+        {/* Floating Quick Actions in a Card */}
+        <View style={styles.contentPadding}>
+          <View style={[styles.modernCard, styles.quickActionsCard]}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handlePhonePress} activeOpacity={0.8}>
+              <View style={[styles.actionIconCircle, { backgroundColor: '#E0E7FF' }]}>
+                <MaterialIcons name="phone" size={20} color="#4F46E5" />
+              </View>
+              <Text style={styles.actionBtnText}>Call</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleEmailPress} activeOpacity={0.8} disabled={!details.email}>
+              <View style={[styles.actionIconCircle, { backgroundColor: '#FCE7F3', opacity: details.email ? 1 : 0.5 }]}>
+                <MaterialIcons name="email" size={20} color="#DB2777" />
+              </View>
+              <Text style={styles.actionBtnText}>Email</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={() => {}} activeOpacity={0.8}>
+              <View style={[styles.actionIconCircle, { backgroundColor: '#DCFCE7' }]}>
+                <MaterialIcons name="message" size={20} color="#16A34A" />
+              </View>
+              <Text style={styles.actionBtnText}>WhatsApp</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.contentPadding}>
@@ -162,6 +174,16 @@ const ViewContactLeadDetails = () => {
           <View style={styles.modernCard}>
             <Text style={styles.cardSectionTitle}>Contact Details</Text>
             <View style={styles.cardDivider} />
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconBox}>
+                <Feather name="user" size={16} color="#64748B" />
+              </View>
+              <View style={styles.detailTextBox}>
+                <Text style={styles.detailLabel}>Name</Text>
+                <Text style={styles.detailValue}>{details.name || 'Unknown'}</Text>
+              </View>
+            </View>
             
             <View style={styles.detailRow}>
               <View style={styles.detailIconBox}>
@@ -194,14 +216,114 @@ const ViewContactLeadDetails = () => {
                 <Text style={styles.detailValue}>{details.sources || 'Organic'}</Text>
               </View>
             </View>
+
+            <View style={styles.detailRowGrid}>
+              <View style={styles.detailColumnLeft}>
+                <View style={styles.detailIconBox}>
+                  <Feather name="map-pin" size={16} color="#64748B" />
+                </View>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>State</Text>
+                  <Text style={styles.detailValue}>{details.state || 'N/A'}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.detailColumnRight}>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>City</Text>
+                  <Text style={styles.detailValue}>{details.city || 'N/A'}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.detailRowGrid}>
+              <View style={styles.detailColumnLeft}>
+                <View style={styles.detailIconBox}>
+                  <Feather name="calendar" size={16} color="#64748B" />
+                </View>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>Created Date</Text>
+                  <Text style={styles.detailValue}>
+                    {details.created_at ? new Date(details.created_at).toLocaleDateString('en-GB') : 'N/A'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.detailColumnRight}>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>Updated Date</Text>
+                  <Text style={styles.detailValue}>
+                    {details.updated_at ? new Date(details.updated_at).toLocaleDateString('en-GB') : 'N/A'}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
 
+          {/* Facebook Details */}
+          {details.sources?.toLowerCase().includes('facebook') && (
+            <View style={styles.modernCard}>
+              <Text style={styles.cardSectionTitle}>Facebook Details</Text>
+              <View style={styles.cardDivider} />
+
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconBox}>
+                  <Feather name="hash" size={16} color="#64748B" />
+                </View>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>Lead ID</Text>
+                  <Text style={styles.detailValue}>{details.leadgen_id || 'N/A'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconBox}>
+                  <Feather name="briefcase" size={16} color="#64748B" />
+                </View>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>Company</Text>
+                  <Text style={styles.detailValue}>{details.company_name || 'N/A'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconBox}>
+                  <Feather name="box" size={16} color="#64748B" />
+                </View>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>Industry</Text>
+                  <Text style={styles.detailValue}>{details.industry || 'N/A'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconBox}>
+                  <Feather name="target" size={16} color="#64748B" />
+                </View>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>Business Goal</Text>
+                  <Text style={styles.detailValue}>{details.business_goal || 'N/A'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconBox}>
+                  <Feather name="monitor" size={16} color="#64748B" />
+                </View>
+                <View style={styles.detailTextBox}>
+                  <Text style={styles.detailLabel}>Meta Ads</Text>
+                  <Text style={styles.detailValue}>{details.meta_ads || 'N/A'}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* Message Notes */}
-          {details.message && (
+          {(details.message || details.sources?.toLowerCase() === 'facebook') && (
             <View style={styles.modernCard}>
               <Text style={styles.cardSectionTitle}> Message</Text>
               <View style={styles.cardDivider} />
-              <Text style={styles.messageText}>{details.message}</Text>
+              <Text style={styles.messageText}>{details.message || 'N/A'}</Text>
             </View>
           )}
 
@@ -241,7 +363,7 @@ const ViewContactLeadDetails = () => {
                         {f.followup_date && (
                           <View style={styles.timelineNextBox}>
                             <MaterialIcons name="event" size={14} color="#0EA5E9" />
-                            <Text style={styles.timelineNextText}>Next Action: {f.followup_date.split(' ')[0]}</Text>
+                            <Text style={styles.timelineNextText}>Follow Up: {f.followup_date.split(' ')[0]}</Text>
                           </View>
                         )}
                       </View>
@@ -328,13 +450,13 @@ const styles = StyleSheet.create({
   },
 
   /* --- Quick Actions --- */
-  quickActionsContainer: {
+  quickActionsCard: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 20,
     marginTop: 24,
-    marginBottom: 24,
-    paddingHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 20,
   },
   actionBtn: {
     alignItems: 'center',
@@ -363,60 +485,80 @@ const styles = StyleSheet.create({
   },
   modernCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    marginBottom: 16,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   cardSectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#0F172A',
-    marginBottom: 12,
+    marginBottom: 10,
+    letterSpacing: 0.3,
   },
   cardDivider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   
   /* --- Details List --- */
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   detailIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: 12,
+    marginTop: 2,
   },
   detailTextBox: {
     flex: 1,
   },
   detailLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: '#64748B',
     marginBottom: 2,
+    textTransform: 'uppercase',
   },
   detailValue: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#1E293B',
     fontWeight: '600',
+    flexShrink: 1,
+  },
+  detailRowGrid: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  detailColumnLeft: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  detailColumnRight: {
+    flex: 1,
+    paddingLeft: 12,
   },
 
   messageText: {
     fontSize: 14,
     color: '#475569',
     lineHeight: 22,
+    fontStyle: 'italic',
     backgroundColor: '#F8FAFC',
-    padding: 12,
+    padding: 16,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#F1F5F9',
@@ -463,7 +605,7 @@ const styles = StyleSheet.create({
   },
   timelineStatus: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0F172A',
     flex: 1,
     marginRight: 8,
