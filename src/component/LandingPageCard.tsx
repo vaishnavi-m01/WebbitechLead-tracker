@@ -326,7 +326,7 @@ const LandingPageCard: React.FC<LandingPageCardProps> = ({
               const response = await api.delete(`/landing-pages/${item.id}`);
               if (response.data) {
                 ToastAndroid.show('Lead deleted successfully', ToastAndroid.SHORT);
-                onDelete(item.id);
+                onDelete?.(item.id);
               }
             } catch (error) {
               console.error('Failed to delete lead:', error);

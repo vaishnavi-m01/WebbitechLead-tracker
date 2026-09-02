@@ -785,7 +785,7 @@ const EditEnquiryForm = () => {
                           <Text style={styles.followupStatusText}>{f.status_relation?.name || 'Status Updated'}</Text>
                           <Text style={styles.followupDateText}>{formattedDate}</Text>
                         </View>
-                        {f.source ? <Text style={styles.followupNextDateText}>Service: {serviceItems.find(s => s.id == f.source || s.value == f.source)?.label || `ID: ${f.source}`}</Text> : null}
+                        {f.source ? <Text style={styles.followupNextDateText}>Service: {serviceItems.find(s => String(s.id) === String(f.source) || String(s.value) === String(f.source))?.label || `ID: ${f.source}`}</Text> : null}
                         {f.commend ? <Text style={styles.followupCommentText}>{f.commend}</Text> : null}
                         {f.followup_date ? (
                           <Text style={styles.followupNextDateText}>Next: {f.followup_date.split(' ')[0]}</Text>

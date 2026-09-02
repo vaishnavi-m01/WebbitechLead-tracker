@@ -275,7 +275,7 @@ const SplashScreen = () => {
         ]}
       >
         <Text style={styles.footerText}>POWERED BY</Text>
-        <Text style={styles.brandText}>YOUR BRAND</Text>
+        <Text style={styles.brandText}>Webbitech</Text>
       </Animated.View>
     </View>
   );

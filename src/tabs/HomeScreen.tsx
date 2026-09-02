@@ -133,8 +133,8 @@ const HomeScreen = () => {
             }
           };
 
-          if (!hasPermission('landing') && activeCategory === 'landing') {
-            const availableCategories: CategoryKey[] = ['landing', 'contact', 'dm', 'graphic'];
+          if (!hasPermission('contact') && activeCategory === 'contact') {
+            const availableCategories: CategoryKey[] = ['contact', 'landing', 'dm', 'graphic'];
             const firstPermitted = availableCategories.find(c => hasPermission(c));
             if (firstPermitted) {
               setActiveCategory(firstPermitted);
@@ -146,8 +146,8 @@ const HomeScreen = () => {
     loadPerms();
   }, []);
 
-  const [activeCategory, setActiveCategory] = useState<CategoryKey>('landing');
-  const [contactSource, setContactSource] = useState<string>('All');
+  const [activeCategory, setActiveCategory] = useState<CategoryKey>('contact');
+  const [contactSource, setContactSource] = useState<string>('Whatsapp');
   const [currentPage, setCurrentPage] = useState(1);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1258,12 +1258,13 @@ const HomeScreen = () => {
     (activeCategory === 'dm' && isLoadingDM) ||
     (activeCategory === 'graphic' && isLoadingGraphic);
 
-  const renderCard = ({ item }: { item: any }) => {
+  const renderCard = ({ item, index }: { item: any; index: number }) => {
     switch (activeCategory) {
       case 'contact':
         return (
           <ContactEnquiryCard
             item={item as ContactEnquiryLead}
+            index={index}
             onAddEnquiry={(contactItem) => {
               navigation.navigate('AddLeadsForm', { leadData: contactItem });
             }}

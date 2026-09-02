@@ -21,6 +21,7 @@ const DRAWER_ITEMS = [
   { key: "dm", label: "Insta DM", icon: "chat" },
   { key: "graphic", label: "Graphic", icon: "brush" },
   { key: "accounts", label: "Accounts", icon: "account-balance-wallet" },
+  // { key: "my-bills", label: "My Bills", icon: "receipt-long" },
 ];
 
 // Shape of the "user" object as it comes back from the login API response
@@ -53,7 +54,7 @@ const formatRole = (role?: string) => {
 function CustomDrawerContent(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const [activeKey, setActiveKey] = React.useState("landing");
+  const [activeKey, setActiveKey] = React.useState("contact");
   const [user, setUser] = useState<LoggedInUser | null>(null);
 
  
@@ -90,6 +91,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
       case 'dm': return webPerms.includes('dm_enquiries');
       case 'graphic': return webPerms.includes('graphic_design_enquiries');
       case 'accounts': return trackerPerms.length > 0;
+      case 'my-bills': return trackerPerms.length > 0;
       default: return true;
     }
   };
@@ -143,6 +145,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                 {item.key === 'accounts' && (
                   <Text style={[styles.sectionHeader, { marginTop: 16 }]}>FINANCE</Text>
                 )}
+                
                 <TouchableOpacity
                   style={[styles.drawerItem, focused && styles.drawerItemActive]}
                   activeOpacity={0.7}
@@ -151,6 +154,10 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                     if (item.key === 'accounts') {
                       props.navigation.navigate("MainTabs", {
                         screen: "FinanceTab",
+                      });
+                    } else if (item.key === 'my-bills') {
+                      props.navigation.navigate("MainTabs", {
+                        screen: "MyBillsTab",
                       });
                     } else {
                       props.navigation.navigate("MainTabs", {

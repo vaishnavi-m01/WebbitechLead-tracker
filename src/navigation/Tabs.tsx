@@ -9,10 +9,12 @@ import { getStoredUser } from "../config/apiConfig";
 import HomeScreen from "../tabs/HomeScreen";
 import ProfileScreen from "../tabs/ProfileScreen";
 import IncomeExpenseScreen from "../tabs/IncomeExpenseScreen";
+import MyBillsScreen from "../screen/MyBillsScreen";
 
 export type MainTabParamList = {
   HomeTab: undefined;
   FinanceTab: undefined;
+  MyBillsTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -21,6 +23,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const TAB_ITEMS = [
   { name: "HomeTab", label: "Home", icon: "home", component: HomeScreen },
   { name: "FinanceTab", label: "Accounts", icon: "account-balance-wallet", component: IncomeExpenseScreen },
+  // { name: "MyBillsTab", label: "My Bills", icon: "receipt-long", component: MyBillsScreen },
   // { name: "ProfileTab", label: "Profile", icon: "person", component: ProfileScreen },
 ];
 

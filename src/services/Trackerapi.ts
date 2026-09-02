@@ -48,6 +48,29 @@ export interface ExpenseAmountPayload {
   status: 'active' | 'inactive';
 }
 
+export interface MyBill {
+  id: number;
+  name: string;
+  amount: number | string;
+  bill_date?: string | null;
+  description?: string | null;
+  status: string | null;
+}
+
+export interface MyBillPayload {
+  name: string;
+  amount: number;
+  bill_date: string;
+  description?: string;
+  status: 'active' | 'inactive';
+}
+
+export const getMyBills = () => api.get<MyBill[]>('/tracker/my-bills');
+export const createMyBill = (data: MyBillPayload) => api.post<MyBill>('/tracker/my-bills/store', data);
+export const getMyBillForEdit = (id: number | string) => api.get<MyBill>(`/tracker/my-bills/${id}/edit`);
+export const updateMyBill = (id: number | string, data: Partial<MyBillPayload>) => api.put<MyBill>(`/tracker/my-bills/${id}`, data);
+export const deleteMyBill = (id: number | string) => api.delete(`/tracker/my-bills/${id}`);
+
 
 /**  /tracker/income-categories – all income categories */
 export const getIncomeCategories = () => {
